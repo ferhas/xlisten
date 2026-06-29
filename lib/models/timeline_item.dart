@@ -17,6 +17,8 @@ class TimelineItem {
   final int? retweets;
   final int? likes;
   final bool promoted;
+  final List<String> images; // 推文配图 URL(pbs.twimg.com)
+  final String? videoThumb; // 视频封面图 URL(有视频时,点开看原文)
   final String tab; // 'for_you' | 'following'
 
   TimelineItem({
@@ -35,6 +37,8 @@ class TimelineItem {
     required this.retweets,
     required this.likes,
     required this.promoted,
+    this.images = const [],
+    this.videoThumb,
     required this.tab,
   });
 
@@ -57,6 +61,14 @@ class TimelineItem {
       retweets: parseNum(j['retweet'] as String?),
       likes: parseNum(j['like'] as String?),
       promoted: url.isEmpty,
+      images: ((j['images'] as List?) ?? const [])
+          .map((e) => '$e')
+          .where((s) => s.isNotEmpty)
+          .toList(),
+      videoThumb: () {
+        final v = (j['videoThumb'] as String?) ?? '';
+        return v.isEmpty ? null : v;
+      }(),
       tab: tab,
     );
   }
@@ -77,6 +89,8 @@ class TimelineItem {
         'retweets': retweets,
         'likes': likes,
         'promoted': promoted,
+        'images': images,
+        'videoThumb': videoThumb,
         'tab': tab,
       };
 
@@ -96,6 +110,8 @@ class TimelineItem {
         retweets: j['retweets'] as int?,
         likes: j['likes'] as int?,
         promoted: j['promoted'] as bool? ?? false,
+        images: ((j['images'] as List?) ?? const []).map((e) => '$e').toList(),
+        videoThumb: j['videoThumb'] as String?,
         tab: j['tab'] as String? ?? 'for_you',
       );
 }

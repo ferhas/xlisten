@@ -26,7 +26,14 @@ const String kExtractJs = r'''
     if(!showMore){var cs=art.querySelectorAll('a,span,button');for(var ci=0;ci<cs.length;ci++){var ct=(cs[ci].textContent||'').trim();if(ct==='显示更多'||ct==='Show more'||ct==='展开'||ct==='展开全文'){showMore=cs[ci];break;}}}
     var tail=(art.innerText||'').slice(-80);
     var truncated=!!showMore||/显示更多|Show more|展开/.test(tail);
-    res.push({name:name,handle:handle,text:text,time:time,url:url,truncated:truncated,reply:stat(art,'reply'),retweet:stat(art,'retweet'),like:stat(art,'like')});
+    var imgs=[],seenu={};
+    var phs=art.querySelectorAll('[data-testid="tweetPhoto"] img');
+    for(var pj=0;pj<phs.length;pj++){var s=phs[pj].getAttribute('src')||'';if(s&&s.indexOf('pbs.twimg.com')>=0&&!seenu[s]){seenu[s]=1;imgs.push(s);}}
+    var vthumb='';
+    var vp=art.querySelector('[data-testid="videoPlayer"],[data-testid="videoComponent"]');
+    if(vp){var vv=vp.querySelector('video');vthumb=(vv&&vv.getAttribute('poster'))||'';if(!vthumb){var vi=vp.querySelector('img');vthumb=(vi&&vi.getAttribute('src'))||'';}}
+    if(vthumb){imgs=imgs.filter(function(u){return u!==vthumb;});}
+    res.push({name:name,handle:handle,text:text,time:time,url:url,truncated:truncated,images:imgs,videoThumb:vthumb,reply:stat(art,'reply'),retweet:stat(art,'retweet'),like:stat(art,'like')});
   }
   return res;
 })()

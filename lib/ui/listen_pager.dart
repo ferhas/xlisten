@@ -143,6 +143,7 @@ class _ListenPagerState extends State<ListenPager> {
                   item: _items[i],
                   onTapToggle: () =>
                       c.player.playing ? c.player.pause() : c.player.play(),
+                  onOpenOriginal: () => _openOriginal(_items[i].url),
                 ),
               ),
             // 顶部:进度条 + 返回(无任何播放控制按钮)
@@ -206,11 +207,13 @@ class _TweetPage extends StatelessWidget {
     required this.controller,
     required this.item,
     required this.onTapToggle,
+    required this.onOpenOriginal,
   });
 
   final ListeningController controller;
   final TimelineItem item;
   final VoidCallback onTapToggle;
+  final VoidCallback onOpenOriginal;
 
   @override
   Widget build(BuildContext context) {
@@ -265,6 +268,7 @@ class _TweetPage extends StatelessWidget {
                           color: Colors.white38, fontSize: 15, height: 1.5),
                     ),
                   ],
+                  ..._media(),
                 ],
               ),
             ),
@@ -272,5 +276,67 @@ class _TweetPage extends StatelessWidget {
         },
       ),
     );
+  }
+
+  /// 配图(内联显示)+ 视频封面(点开看原文)。图片走 pbs.twimg.com 公开 CDN。
+  List<Widget> _media() {
+    final out = <Widget>[];
+    final vt = item.videoThumb;
+    if (vt != null && vt.isNotEmpty) {
+      out.add(const SizedBox(height: 16));
+      out.add(GestureDetector(
+        onTap: onOpenOriginal,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Stack(alignment: Alignment.center, children: [
+            Image.network(_hi(vt),
+                fit: BoxFit.cover,
+                width: double.infinity,
+                errorBuilder: (_, __, ___) => const SizedBox.shrink()),
+            Container(
+              decoration: const BoxDecoration(
+                  color: Colors.black54, shape: BoxShape.circle),
+              padding: const EdgeInsets.all(12),
+              child: const Icon(Icons.play_arrow, color: Colors.white, size: 44),
+            ),
+            const Positioned(
+              bottom: 8,
+              right: 10,
+              child: Text('视频 · 点开看',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      shadows: [Shadow(blurRadius: 4, color: Colors.black)])),
+            ),
+          ]),
+        ),
+      ));
+    }
+    for (final img in item.images) {
+      out.add(const SizedBox(height: 12));
+      out.add(ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Image.network(_hi(img),
+            fit: BoxFit.fitWidth,
+            width: double.infinity,
+            loadingBuilder: (ctx, child, p) => p == null
+                ? child
+                : Container(
+                    height: 180,
+                    alignment: Alignment.center,
+                    child: const CircularProgressIndicator(strokeWidth: 2)),
+            errorBuilder: (_, __, ___) => const SizedBox.shrink()),
+      ));
+    }
+    return out;
+  }
+
+  /// 升级 pbs.twimg.com 缩略图到中等清晰度。
+  String _hi(String url) {
+    if (!url.contains('pbs.twimg.com')) return url;
+    if (url.contains('name=')) {
+      return url.replaceAll(RegExp(r'name=[^&]+'), 'name=medium');
+    }
+    return '$url${url.contains('?') ? '&' : '?'}name=medium';
   }
 }
