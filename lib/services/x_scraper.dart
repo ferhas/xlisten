@@ -127,11 +127,12 @@ class XScraper {
     int target = 40,
     int maxScrolls = 60,
     int staleStop = 8,
+    void Function(List<Map<String, dynamic>> all)? onProgress, // 每发现一批就回调,供增量显示
   }) async {
     await eval(_tabClickExpr(tabNames));
-    await _sleep(2500, 5000);
+    await _sleep(2000, 4000);
     await controller.runJavaScript('window.scrollTo(0,0);');
-    await _sleep(1000, 2200);
+    await _sleep(900, 1800);
     // 先等时间线渲染出来(冷加载/慢网时,推文要点 tab 后才出现),避免抓空。
     await waitForSelector('article', timeout: const Duration(seconds: 15));
 
@@ -140,17 +141,19 @@ class XScraper {
     for (var i = 0; i < maxScrolls; i++) {
       final before = store.length;
       await _collect(store);
+      if (store.length != before) onProgress?.call(store.values.toList());
       if (store.length >= target) break;
       stale = (store.length == before) ? stale + 1 : 0;
       if (stale >= staleStop) break;
-      // 向下滚足够距离(1.1~2.1 屏)才能触发 X 懒加载出新推;随机化 + 人类停顿。
+      // 向下滚足够距离(1.1~2.1 屏)触发 X 懒加载;随机化 + 适度人类停顿。
       final factor = (1.1 + _rng.nextDouble()).toStringAsFixed(2);
       await controller
           .runJavaScript('window.scrollBy(0, window.innerHeight*$factor);');
-      await _sleep(1800, 4200); // 随机停顿(拟人,但不阻碍加载)
-      if (_rng.nextInt(5) == 0) await _sleep(3500, 7000); // 偶尔停久一点「读一会」
+      await _sleep(1200, 2800);
+      if (_rng.nextInt(6) == 0) await _sleep(2500, 5000); // 偶尔停久一点
     }
     await _collect(store);
+    onProgress?.call(store.values.toList());
     return store.values.take(target).toList();
   }
 

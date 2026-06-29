@@ -216,6 +216,7 @@ class ListeningController extends ChangeNotifier {
     if (loading) return 0;
     loading = true;
     lastError = null;
+    _lastAutoFetch = DateTime.now(); // 任何刷新都重置冷却,避免一刷完又立刻自动刷
     notifyListeners();
     try {
       await homeScraper.controller.loadRequest(Uri.parse('https://x.com/home'));
@@ -231,17 +232,25 @@ class ListeningController extends ChangeNotifier {
       final names = tab == 'for_you'
           ? const ['为你推荐', 'For you']
           : const ['正在关注', 'Following'];
-      final raw = await homeScraper.scrapeTab(names, target: 40);
-      final scraped = raw.map((m) => TimelineItem.fromScrape(m, tab)).toList();
-      _purgeRead(tab); // Req2:已读条目只在此刻(下次刷新)才从列表移走
-      final added = _ingest(scraped, tab);
+      _purgeRead(tab); // 已读条目只在此刻(刷新时)才从列表移走(一次)
+      var total = 0;
+      await homeScraper.scrapeTab(names, target: 30, onProgress: (rawList) {
+        final scraped =
+            rawList.map((m) => TimelineItem.fromScrape(m, tab)).toList();
+        final added = _ingest(scraped, tab); // 去重后只加新的
+        if (added > 0) {
+          total += added;
+          notifyListeners(); // 抓到就显示:一点出来一点,不必整批抓完
+        }
+      });
       loading = false;
       notifyListeners();
-      _kickPreSynth(); // Req1:新内容后台预合成
-      return added;
+      _kickPreSynth(); // 新内容后台预合成
+      return total;
     } catch (e) {
       loading = false;
       lastError = '$e';
+      debugPrint('XL refresh error: $e');
       notifyListeners();
       return 0;
     }
@@ -260,7 +269,7 @@ class ListeningController extends ChangeNotifier {
         .where((it) => !queued.contains(it.key))
         .where((it) => !otherKeys.contains(it.key)) // 跨「推荐/关注」去重
         .toList();
-    q.insertAll(0, fresh); // 只增不减,新内容置顶
+    q.addAll(fresh); // 追加(增量抓取时保持时间线顺序:新→旧)
     _persist();
     return fresh.length;
   }
