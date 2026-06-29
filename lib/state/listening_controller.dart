@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -52,6 +53,9 @@ class ListeningController extends ChangeNotifier {
   bool fullscreenActive = false; // 抖音全屏播放器开着时,_onCompleted 只标记已听,由播放器翻页
   bool _prefetching = false;
   int _consecutiveFails = 0; // 连续合成失败计数(限流时止损,别空转烧队列)
+  final Random _rng = Random();
+  DateTime? _lastAutoFetch; // 上次自动抓取时间(节流,拟人化慢补)
+  static const int kBufferTarget = 30; // 未读缓冲目标:低于它才后台慢补
   Timer? _sleepTimer;
   int? sleepAfterMin; // 当前定时关闭(分钟);null = 未设定时
   Future<void> _ensureLock = Future.value(); // 串行化详情页(共享 WebView)
@@ -227,7 +231,7 @@ class ListeningController extends ChangeNotifier {
       final names = tab == 'for_you'
           ? const ['为你推荐', 'For you']
           : const ['正在关注', 'Following'];
-      final raw = await homeScraper.scrapeTab(names, target: 30);
+      final raw = await homeScraper.scrapeTab(names, target: 40);
       final scraped = raw.map((m) => TimelineItem.fromScrape(m, tab)).toList();
       _purgeRead(tab); // Req2:已读条目只在此刻(下次刷新)才从列表移走
       final added = _ingest(scraped, tab);
@@ -246,11 +250,15 @@ class ListeningController extends ChangeNotifier {
   int _ingest(List<TimelineItem> scraped, String tab) {
     final q = queue(tab);
     final queued = {for (final it in q) it.key};
+    // 跨 tab 去重:另一个 tab 队列里已有的同一条,不再重复进本 tab(谁先有谁留)。
+    final other = tab == 'for_you' ? following : forYou;
+    final otherKeys = {for (final it in other) it.key};
     final fresh = scraped
         .where((it) => !it.promoted)
         .where(_isPlayable)
         .where((it) => !_seen.contains(it.key)) // 全时段去重:听过永不再现
         .where((it) => !queued.contains(it.key))
+        .where((it) => !otherKeys.contains(it.key)) // 跨「推荐/关注」去重
         .toList();
     q.insertAll(0, fresh); // 只增不减,新内容置顶
     _persist();
@@ -299,7 +307,16 @@ class ListeningController extends ChangeNotifier {
 
   void _maybePrefetch() {
     if (!autoFetch || _prefetching || loading) return;
-    if (unreadCount(playingTab) > 12) return; // 未读 ≤12 就提前抓下一批
+    // 缓冲 ≥30 条就不抓:留足量,不必等到很少才一次性补。
+    if (unreadCount(playingTab) >= kBufferTarget) return;
+    // 拟人化:两次自动抓取至少间隔 60–150s(随机),后台慢慢补、别像机器连抓。
+    final gapSec = 60 + _rng.nextInt(91);
+    final now = DateTime.now();
+    if (_lastAutoFetch != null &&
+        now.difference(_lastAutoFetch!).inSeconds < gapSec) {
+      return;
+    }
+    _lastAutoFetch = now;
     _prefetching = true;
     () async {
       try {

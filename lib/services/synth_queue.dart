@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import '../models/timeline_item.dart';
 
@@ -20,6 +21,7 @@ class SynthQueue {
   final bool Function(TimelineItem item) needsFull;
 
   int _gen = 0;
+  final Random _rng = Random();
 
   void cancel() => _gen++;
 
@@ -43,7 +45,11 @@ class SynthQueue {
         if (gen != _gen) return;
         await _ttsOne(it);
       } catch (_) {}
-      await Future<void>.delayed(const Duration(milliseconds: 1500));
+      // 拟人化:每次进详情页之间随机 2–5s,偶尔停更久。
+      await Future<void>.delayed(Duration(milliseconds: 2000 + _rng.nextInt(3000)));
+      if (_rng.nextInt(5) == 0) {
+        await Future<void>.delayed(Duration(milliseconds: 3000 + _rng.nextInt(5000)));
+      }
     }
   }
 

@@ -85,7 +85,7 @@ class _ListenPagerState extends State<ListenPager> {
     for (var j = i + 1; j < _items.length; j++) {
       if (!_items[j].read) remaining++;
     }
-    if (remaining <= 12) c.prefetchMore(widget.tab);
+    if (remaining <= 30) c.prefetchMore(widget.tab); // 缓冲低于 30 就提示后台慢补
   }
 
   void _onAudioCompleted(TimelineItem done) {

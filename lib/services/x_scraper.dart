@@ -23,8 +23,9 @@ const String kExtractJs = r'''
     var url='',time='';
     if(timeEl){time=timeEl.getAttribute('datetime')||'';var a=timeEl.closest('a');if(a){url=a.href;}}
     var showMore=art.querySelector('[data-testid="tweet-text-show-more-link"]');
-    var tail=(art.innerText||'').slice(-40);
-    var truncated=!!showMore||/显示更多|Show more/.test(tail);
+    if(!showMore){var cs=art.querySelectorAll('a,span,button');for(var ci=0;ci<cs.length;ci++){var ct=(cs[ci].textContent||'').trim();if(ct==='显示更多'||ct==='Show more'||ct==='展开'||ct==='展开全文'){showMore=cs[ci];break;}}}
+    var tail=(art.innerText||'').slice(-80);
+    var truncated=!!showMore||/显示更多|Show more|展开/.test(tail);
     res.push({name:name,handle:handle,text:text,time:time,url:url,truncated:truncated,reply:stat(art,'reply'),retweet:stat(art,'retweet'),like:stat(art,'like')});
   }
   return res;
@@ -116,14 +117,14 @@ class XScraper {
   /// 切到目标 tab、随机滚动收集，直到达到 target 或连续 staleStop 次无新增。
   Future<List<Map<String, dynamic>>> scrapeTab(
     List<String> tabNames, {
-    int target = 30,
-    int maxScrolls = 40,
+    int target = 40,
+    int maxScrolls = 60,
     int staleStop = 8,
   }) async {
     await eval(_tabClickExpr(tabNames));
-    await _sleep(2500, 4500);
+    await _sleep(2500, 5000);
     await controller.runJavaScript('window.scrollTo(0,0);');
-    await _sleep(900, 1800);
+    await _sleep(1000, 2200);
     // 先等时间线渲染出来(冷加载/慢网时,推文要点 tab 后才出现),避免抓空。
     await waitForSelector('article', timeout: const Duration(seconds: 15));
 
@@ -135,10 +136,17 @@ class XScraper {
       if (store.length >= target) break;
       stale = (store.length == before) ? stale + 1 : 0;
       if (stale >= staleStop) break;
-      final factor = (1.1 + _rng.nextDouble()).toStringAsFixed(2); // 1.1~2.1 屏
+      // 小步、不规律地滚(像在读),每屏 0.6~1.4,偶尔回滚一点点。
+      final factor = (0.6 + _rng.nextDouble() * 0.8).toStringAsFixed(2);
       await controller
           .runJavaScript('window.scrollBy(0, window.innerHeight*$factor);');
-      await _sleep(1500, 3600); // 随机停顿，拟人化、降风控
+      await _sleep(2200, 6000); // 基础随机停顿
+      if (_rng.nextInt(4) == 0) await _sleep(5000, 12000); // 1/4 概率「停下读一会」
+      if (_rng.nextInt(7) == 0) {
+        await controller.runJavaScript(
+            'window.scrollBy(0, -window.innerHeight*0.3);'); // 偶尔往回看
+        await _sleep(1200, 2600);
+      }
     }
     await _collect(store);
     return store.values.take(target).toList();
