@@ -143,17 +143,12 @@ class XScraper {
       if (store.length >= target) break;
       stale = (store.length == before) ? stale + 1 : 0;
       if (stale >= staleStop) break;
-      // 小步、不规律地滚(像在读),每屏 0.6~1.4,偶尔回滚一点点。
-      final factor = (0.6 + _rng.nextDouble() * 0.8).toStringAsFixed(2);
+      // 向下滚足够距离(1.1~2.1 屏)才能触发 X 懒加载出新推;随机化 + 人类停顿。
+      final factor = (1.1 + _rng.nextDouble()).toStringAsFixed(2);
       await controller
           .runJavaScript('window.scrollBy(0, window.innerHeight*$factor);');
-      await _sleep(2200, 6000); // 基础随机停顿
-      if (_rng.nextInt(4) == 0) await _sleep(5000, 12000); // 1/4 概率「停下读一会」
-      if (_rng.nextInt(7) == 0) {
-        await controller.runJavaScript(
-            'window.scrollBy(0, -window.innerHeight*0.3);'); // 偶尔往回看
-        await _sleep(1200, 2600);
-      }
+      await _sleep(1800, 4200); // 随机停顿(拟人,但不阻碍加载)
+      if (_rng.nextInt(5) == 0) await _sleep(3500, 7000); // 偶尔停久一点「读一会」
     }
     await _collect(store);
     return store.values.take(target).toList();
