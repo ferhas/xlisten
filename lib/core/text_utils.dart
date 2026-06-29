@@ -87,5 +87,16 @@ String itemKey(String handle, String text, String url) {
 String? makeReadingText(String author, String text) {
   final body = clean(text);
   if (body.runes.length < 15) return null; // 过滤 15 字以下的短内容
-  return '${author.trim()}：$body';
+  return '${shortAuthor(author)}：$body';
+}
+
+/// 朗读用的「短作者名」:砍掉括号/竖线后的描述性后缀(如「立党（劝人卖房/学CS…）」),
+/// 再封顶 14 字,避免名字太长把开头读很久。
+String shortAuthor(String author) {
+  var s = author.trim();
+  final m = RegExp(r'[（(｜|【\[]').firstMatch(s);
+  if (m != null && m.start >= 1) s = s.substring(0, m.start).trim();
+  final runes = s.runes.toList();
+  if (runes.length > 14) s = String.fromCharCodes(runes.take(14));
+  return s.isEmpty ? author.trim() : s;
 }

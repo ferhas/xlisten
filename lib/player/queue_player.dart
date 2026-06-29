@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:audio_session/audio_session.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:just_audio_background/just_audio_background.dart';
 
 import '../models/timeline_item.dart';
 
@@ -52,12 +52,7 @@ class QueuePlayer {
       _player.processingState == ProcessingState.completed;
 
   Future<void> init() async {
-    final session = await AudioSession.instance;
-    await session.configure(const AudioSessionConfiguration.speech());
-    session.interruptionEventStream.listen((e) {
-      if (e.begin) _player.pause();
-    });
-    session.becomingNoisyEventStream.listen((_) => _player.pause());
+    // 音频焦点/中断/拔耳机 由 just_audio_background(audio_service)统一处理,这里不再单独配 session。
     _stateSub = _player.playerStateStream
         .where((s) => s.processingState == ProcessingState.completed)
         .listen((_) async {
@@ -75,7 +70,14 @@ class QueuePlayer {
     try {
       final file = await _warm(it);
       if (_disposed) return;
-      await _player.setAudioSource(AudioSource.uri(Uri.file(file.path)));
+      await _player.setAudioSource(AudioSource.uri(
+        Uri.file(file.path),
+        tag: MediaItem(
+          id: it.key,
+          title: it.author.isEmpty ? it.handle : it.author,
+          artist: '${it.tab == 'following' ? '正在关注' : '为你推荐'} · xlisten',
+        ),
+      ));
       if (_disposed) return;
       onStarted?.call(it); // 合成成功+音源就绪 → 真正开始,可安全标记已读
       await _player.play();
@@ -114,7 +116,10 @@ class QueuePlayer {
   Future<void> playSample(String path) async {
     _current = null;
     _emit();
-    await _player.setAudioSource(AudioSource.uri(Uri.file(path)));
+    await _player.setAudioSource(AudioSource.uri(
+      Uri.file(path),
+      tag: const MediaItem(id: 'sample', title: '音色试听', artist: 'xlisten'),
+    ));
     await _player.play();
   }
 

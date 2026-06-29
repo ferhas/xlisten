@@ -1,11 +1,13 @@
 package com.xlisten.xlisten
 
 import android.webkit.CookieManager
-import io.flutter.embedding.android.FlutterActivity
+import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
-class MainActivity : FlutterActivity() {
+// 继承 AudioServiceActivity(就是带正确引擎的 FlutterActivity):
+// 让 just_audio_background 复用本引擎/同一 isolate,避免再起第二个 isolate 抢库写坏 prefs。
+class MainActivity : AudioServiceActivity() {
     private val channelName = "xlisten/cookies"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {

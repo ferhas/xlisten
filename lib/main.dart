@@ -1,8 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:just_audio_background/just_audio_background.dart';
 
 import 'ui/home_shell.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  // 前台服务 + 媒体通知:息屏/后台也能继续朗读,锁屏有播放控制。
+  await JustAudioBackground.init(
+    androidNotificationChannelId: 'com.xlisten.xlisten.channel.audio',
+    androidNotificationChannelName: 'xlisten 朗读',
+    androidNotificationOngoing: true,
+    androidStopForegroundOnPause: true,
+  );
   runApp(const XListenApp());
 }
 
