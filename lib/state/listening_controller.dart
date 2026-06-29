@@ -517,7 +517,10 @@ class ListeningController extends ChangeNotifier {
   /// 试听:一次性合成样例直接播放,不进队列、不写 seen。
   Future<void> previewVoice() async {
     try {
-      final f = await tts.synthSample('你好，这是${voiceById(voice).name}音色的语音试听。');
+      final text = voice == kRandomVoice
+          ? '随机音色，每条推文会用不同的声音朗读。'
+          : '你好，这是${voiceById(voice).name}音色的语音试听。';
+      final f = await tts.synthSample(text);
       await player.playSample(f.path);
     } catch (_) {}
   }

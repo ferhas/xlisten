@@ -43,6 +43,7 @@ class _HomeShellState extends State<HomeShell>
   bool _firstFetched = false;
   DateTime? _lastTabTap; // 双击 TAB 检测(清理已读)
   int? _lastTabIndex;
+  bool _wasPlayingBeforeBg = false; // 进后台前是否在播(回前台据此续播)
 
   @override
   void initState() {
@@ -81,10 +82,25 @@ class _HomeShellState extends State<HomeShell>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.inactive) {
-      CookieBridge.flush(); // 后台时强制把 cookie 落盘
-      _c.captureCookies();
+    switch (state) {
+      case AppLifecycleState.paused:
+      case AppLifecycleState.hidden:
+        // 进后台/熄屏:暂停播放,避免被系统静音却仍在「无声快进」乱跳到别处。
+        _wasPlayingBeforeBg = _c.ready && _c.player.playing;
+        if (_wasPlayingBeforeBg) _c.player.pause();
+        CookieBridge.flush(); // 顺便把 cookie 落盘
+        _c.captureCookies();
+        break;
+      case AppLifecycleState.resumed:
+        // 回前台:从【原来那条的当前位置】继续,不跳走。
+        if (_wasPlayingBeforeBg) {
+          _wasPlayingBeforeBg = false;
+          if (_c.ready) _c.player.play();
+        }
+        break;
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.detached:
+        break;
     }
   }
 

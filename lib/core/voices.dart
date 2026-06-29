@@ -6,7 +6,11 @@ class VoiceOption {
   const VoiceOption(this.id, this.name, this.desc);
 }
 
+/// 随机音色:每条朗读按内容稳定地随机挑一个具体音色(同一条始终同一个,利于缓存)。
+const String kRandomVoice = 'random';
+
 const List<VoiceOption> kVoices = [
+  VoiceOption(kRandomVoice, '随机', '每条不同音色'),
   VoiceOption('zh-CN-XiaoxiaoNeural', '晓晓', '女声 · 默认'),
   VoiceOption('zh-CN-YunxiNeural', '云希', '男声 · 沉稳'),
   VoiceOption('zh-CN-YunyangNeural', '云扬', '男声 · 新闻播报'),
@@ -14,6 +18,10 @@ const List<VoiceOption> kVoices = [
   VoiceOption('zh-CN-YunjianNeural', '云健', '男声 · 浑厚'),
   VoiceOption('zh-CN-liaoning-XiaobeiNeural', '辽宁小北', '东北女声'),
 ];
+
+/// 可实际合成的具体音色(排除「随机」这个虚拟项)。
+List<VoiceOption> concreteVoices() =>
+    kVoices.where((v) => v.id != kRandomVoice).toList();
 
 VoiceOption voiceById(String id) =>
     kVoices.firstWhere((v) => v.id == id, orElse: () => kVoices.first);

@@ -30,8 +30,18 @@ class TtsService {
     return d;
   }
 
+  /// 解析这条实际用的音色:非随机直接用 voice;随机则按 id 稳定地挑一个具体音色
+  /// (同一条始终同一个 → 缓存稳定;不同条不同 → 听起来随机)。
+  String _effectiveVoice(String id) {
+    if (voice != kRandomVoice) return voice;
+    final cs = concreteVoices();
+    final b = md5.convert(utf8.encode(id)).bytes;
+    final n = ((b[0] << 24) | (b[1] << 16) | (b[2] << 8) | b[3]) % cs.length;
+    return cs[n].id;
+  }
+
   String _hash(String id) =>
-      md5.convert(utf8.encode('$id|$voice|$rate')).toString();
+      md5.convert(utf8.encode('$id|${_effectiveVoice(id)}|$rate')).toString();
 
   Future<File> synthToFile(String text, String id) async {
     final dir = await _audioDir();
@@ -47,7 +57,8 @@ class TtsService {
       return f;
     }
 
-    final bytes = await EdgeTts.synthesize(text: text, rate: rate, voice: voice);
+    final bytes = await EdgeTts.synthesize(
+        text: text, rate: rate, voice: _effectiveVoice(id));
     await f.writeAsBytes(bytes, flush: true);
     lru.remove(h);
     lru.add(h);
@@ -82,9 +93,10 @@ class TtsService {
     await _audioDir();
   }
 
-  /// 试听:合成样例到 temp(不进 LRU 缓存)。
+  /// 试听:合成样例到 temp(不进 LRU 缓存)。随机音色时用第一个具体音色示范。
   Future<File> synthSample(String text) async {
-    final bytes = await EdgeTts.synthesize(text: text, rate: rate, voice: voice);
+    final v = voice == kRandomVoice ? concreteVoices().first.id : voice;
+    final bytes = await EdgeTts.synthesize(text: text, rate: rate, voice: v);
     final dir = await getTemporaryDirectory();
     final f = File('${dir.path}/tts_sample.mp3');
     await f.writeAsBytes(bytes, flush: true);
