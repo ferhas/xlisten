@@ -31,6 +31,7 @@ class _ListenPagerState extends State<ListenPager> {
   late List<TimelineItem> _items;
   int _index = 0;
   bool _programmatic = false;
+  double _pullDown = 0; // 累计下拉量,超阈值则返回列表
   StreamSubscription<TimelineItem>? _completedSub;
 
   ListeningController get c => widget.controller;
@@ -133,17 +134,34 @@ class _ListenPagerState extends State<ListenPager> {
               const Center(
                   child: Text('没有内容', style: TextStyle(color: Colors.white)))
             else
-              PageView.builder(
-                controller: _pageCtl,
-                scrollDirection: Axis.horizontal,
-                onPageChanged: _onPageChanged,
-                itemCount: _items.length,
-                itemBuilder: (ctx, i) => _TweetPage(
-                  controller: c,
-                  item: _items[i],
-                  onTapToggle: () =>
-                      c.player.playing ? c.player.pause() : c.player.play(),
-                  onOpenOriginal: () => _openOriginal(_items[i].url),
+              // 在正文滚到顶后继续下拉 → 返回列表(横滑仍是上/下一条)。
+              NotificationListener<ScrollNotification>(
+                onNotification: (n) {
+                  if (n.metrics.axis != Axis.vertical) return false;
+                  if (n is ScrollStartNotification ||
+                      n is ScrollUpdateNotification) {
+                    _pullDown = 0;
+                  } else if (n is OverscrollNotification && n.overscroll < 0) {
+                    _pullDown += -n.overscroll;
+                    if (_pullDown > 120 && mounted) {
+                      _pullDown = 0;
+                      Navigator.of(context).pop(); // 显式 pop,不受 PopScope 影响
+                    }
+                  }
+                  return false;
+                },
+                child: PageView.builder(
+                  controller: _pageCtl,
+                  scrollDirection: Axis.horizontal,
+                  onPageChanged: _onPageChanged,
+                  itemCount: _items.length,
+                  itemBuilder: (ctx, i) => _TweetPage(
+                    controller: c,
+                    item: _items[i],
+                    onTapToggle: () =>
+                        c.player.playing ? c.player.pause() : c.player.play(),
+                    onOpenOriginal: () => _openOriginal(_items[i].url),
+                  ),
                 ),
               ),
             // 顶部:进度条 + 返回(无任何播放控制按钮)
@@ -227,6 +245,7 @@ class _TweetPage extends StatelessWidget {
           return Opacity(
             opacity: read ? 0.6 : 1.0,
             child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(22, 60, 22, 64),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
